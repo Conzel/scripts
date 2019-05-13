@@ -1,0 +1,91 @@
+#!/bin/bash
+
+config_location="$HOME/.config/dot"
+
+# This file keeps track of which files we linked with exact paths
+[ ! -f "$config_location/linked_files" ] && echo "Config file does not exist. Creating..."  \
+    && mkdir -p $config_location && touch "$config_location/linked_files"
+
+repo_location="$HOME/.dotfiles"
+[ ! -d "$repo_location" ] && echo "No repository found. Please create a standard Github repository you would like to use under $HOME/.dotfiles" \
+    && echo "Remote branch should be called origin"
+
+# for help call
+usage () {
+    echo "--help | h:                   print this menu and exit "
+    echo "pull <branch>:                pulls from specified branch from origin"
+    echo "push <branch>:                pushes to specified branch" 
+    echo "checkout <branch>:            checkout to specific branch" 
+    echo "commit <message>:             commits with specified message to active branch in repository" 
+    echo "add <file>:                   copies file to repository and replaces it with a symlink to the repo" 
+    echo "unlink <file>:                replaces symlink with file copy from dotfiles directory"
+    echo "remove <file>:                removes file from repository. If given file is a symlink in actual directory, unlinks it beforehand"
+}
+
+gitd () {
+    git --git-dir=$HOME/.dotfiles/.git --work-tree /home/almico/.dotfiles "$@"
+}
+
+[ "$1" == "" ] && usage && exit
+
+# main loop
+while [ "$1" != "" ]; do
+    case $1 in
+        --help | -h )      usage 
+                           exit
+                           ;;
+        pull )      shift
+                    gitd pull origin $1
+                    exit
+                    ;;
+        commit )    shift
+                    gitd commit -a -m "$1"
+                    ;;
+        checkout )  shift
+                    gitd checkout $1
+                    ;;
+        push )      shift
+                    gitd push origin $1 
+                    ;;
+        status )    gitd status
+                    exit
+                    ;;
+        add )      shift
+                    dotfile=$(echo $PWD | sed 's@'$HOME'@'$HOME'/.dotfiles@')
+                    echo "Searching $dotfile..."
+                    [ -f $dotfile/$1 ] && echo "This file already exists in your repository. Aborting. " && exit 1
+                    mkdir -p $dotfile
+                    cp $1 $dotfile/$1
+                    echo "Copied file \"$1\" to repository under \"$dotfile\". "
+                    gitd add $dotfile/$1
+                    echo "Added file to commit."
+                    rm $1 
+                    ln -s $dotfile/$1 $1
+                    echo "Replaced file with symlink."
+                    exit
+                    ;;
+        unlink )    shift
+                    [ ! -L $1 ] && echo "The given name is not a symbolic link. Aborting." && exit 1
+                    dotfile=$(echo $PWD | sed 's@'$HOME'@'$HOME'/.dotfiles@')
+                    [ ! -f $dotfile/$1 ] && echo "This file is not in your repository. Aborting." && exit 1
+                    rm $1
+                    cp $dotfile/$1 $1
+                    echo "Replaced symlink with copy from repository."
+                    ;;
+
+        remove )    shift
+                    [ -L $1 ] && echo "Unlinking file \"$1\" " && dot unlink $1
+                    dotfile=$(echo $PWD | sed 's@'$HOME'@'$HOME'/.dotfiles@')
+                    [ ! -f $dotfile/$1 ] && echo "This file is not in your repository. Aborting." && exit 1
+                    rm $dotfile/$1
+                    echo "Removed file from repository."
+                    ;; 
+                    
+        * )         usage
+                    exit 1
+    esac
+    shift
+done
+
+                    
+                
