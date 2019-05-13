@@ -1,5 +1,9 @@
 #!/bin/bash
 
+#TODO:
+# Add possibility to automatically connect whole repository [anchor / tether]
+# And also to automatically disconnect whole repository [unanchor / untether]
+
 config_location="$HOME/.config/dot"
 
 # Maybe we can do without config, just leaving it here in case
@@ -18,8 +22,9 @@ usage () {
     echo "checkout <branch>            checkout to specific branch" 
     echo "commit <message>             commits with specified message to active branch in repository" 
     echo "add <file>                   copies file to repository and replaces it with a symlink to the repo" 
-    echo "unlink <file>                replaces symlink with file copy from dotfiles directory"
     echo "remove <file>                removes file from repository. If given file is a symlink in actual directory, unlinks it beforehand"
+    echo "link <file>                  searches for file in repository and creates a link in folder" 
+    echo "unlink <file>                replaces symlink with file copy from dotfiles directory"
 }
 
 gitd () {
@@ -30,6 +35,7 @@ error_report() {
     # $1: command used $2 file targeted $3 filepath $4 action
     echo "Execution failed [unchecked error]"
     echo "Command: $1; file targeted: $2; filepath: $3; action: $4"
+    exit 1
 }
 
 [ "$1" == "" ] && usage && exit
@@ -64,15 +70,26 @@ while [ "$1" != "" ]; do
                         dotfile=$(echo $PWD | sed 's@'$HOME'@'$HOME'/.dotfiles@')
                         echo "Searching $dotfile..."
                         [ -f $dotfile/$1 ] && echo "This file already exists in your repository. Skipping. " && continue
-                        mkdir -p $dotfile || error_report add $1 $dotfile/$1 "Directory Creation" && continue
-                        cp $1 $dotfile/$1 || error_report add $1 $dotfile/$1 "Copying" && continue
+                        mkdir -p $(dirname $dotfile/$1) || error_report add $1 $dotfile/$1 "Directory Creation"
+                        cp $1 $dotfile/$1 || error_report add $1 $dotfile/$1 "Copying" 
                         echo "Copied file \"$1\" to repository under \"$dotfile\". "
                         gitd add $dotfile/$1
                         echo "Added file to commit."
                         rm $1 
-                        ln -s $dotfile/$1 $1 || error_report add $1 $dotfile/$1 "Symlinking"  && continue
+                        ln -s $dotfile/$1 $1 || error_report add $1 $dotfile/$1 "Symlinking" 
                         echo "Replaced file with symlink."
                     done 
+                    ;;
+        link )     
+                    while [ "$2" != "" ]; do
+                        shift
+                        [ -f $1 ] && echo "File \"$1\"already exists. Consider using add or removing the file." && continue
+                        dotfile=$(echo $PWD | sed 's@'$HOME'@'$HOME'/.dotfiles@')
+                        [ ! -f $dotfile/$1 ] && echo "This file is not in your repository. Skipping." && continue
+                        mkdir -p $(dirname $1) || error_report add $1 $dotfile/$1 "Directory Creation" 
+                        ln -s $dotfile/$1 $1 || error_report link $1 $dotfile/$1 "Symlinking" 
+                        echo "Symlinked file from repository."
+                    done
                     ;;
         unlink )   
                     while [ "$2" != "" ]; do
@@ -80,8 +97,8 @@ while [ "$1" != "" ]; do
                         [ ! -L $1 ] && echo "The given name is not a symbolic link. Skipping." && continue
                         dotfile=$(echo $PWD | sed 's@'$HOME'@'$HOME'/.dotfiles@')
                         [ ! -f $dotfile/$1 ] && echo "This file is not in your repository. Skipping." && continue
-                        rm $1 || error_report unlink $1 $dotfile/$1 "Removing symlink" && continue
-                        cp $dotfile/$1 $1 || error_report unlink $1 $dotfile/$1 "Copying dotfile" && continue
+                        rm $1 || error_report unlink $1 $dotfile/$1 "Removing symlink"
+                        cp $dotfile/$1 $1 || error_report unlink $1 $dotfile/$1 "Copying dotfile"
                         echo "Replaced symlink with copy from repository."
                     done
                     ;;
@@ -93,7 +110,7 @@ while [ "$1" != "" ]; do
                             [ -L $1 ] && echo "Unlinking file \"$1\" " && dot unlink $1
                             dotfile=$(echo $PWD | sed 's@'$HOME'@'$HOME'/.dotfiles@')
                             [ ! -f $dotfile/$1 ] && echo "This file is not in your repository. Skipping." && continue
-                            rm $dotfile/$1 ||  error_report remove $1 $dotfile/$1 "Removing dotfile from repository" && continue
+                            rm $dotfile/$1 ||  error_report remove $1 $dotfile/$1 "Removing dotfile from repository"
                             echo "Removed file from repository."
                     done
                     ;; 
