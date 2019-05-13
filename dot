@@ -54,8 +54,8 @@ while [ "$1" != "" ]; do
                     dotfile=$(echo $PWD | sed 's@'$HOME'@'$HOME'/.dotfiles@')
                     echo "Searching $dotfile..."
                     [ -f $dotfile/$1 ] && echo "This file already exists in your repository. Aborting. " && exit 1
-                    mkdir -p $dotfile
-                    cp $1 $dotfile/$1
+                    mkdir -p $dotfile || exit 1
+                    cp $1 $dotfile/$1 || exit 1
                     echo "Copied file \"$1\" to repository under \"$dotfile\". "
                     gitd add $dotfile/$1
                     echo "Added file to commit."
@@ -68,8 +68,7 @@ while [ "$1" != "" ]; do
                     [ ! -L $1 ] && echo "The given name is not a symbolic link. Aborting." && exit 1
                     dotfile=$(echo $PWD | sed 's@'$HOME'@'$HOME'/.dotfiles@')
                     [ ! -f $dotfile/$1 ] && echo "This file is not in your repository. Aborting." && exit 1
-                    rm $1
-                    cp $dotfile/$1 $1
+                    cp $dotfile/$1 $1 || exit 1
                     echo "Replaced symlink with copy from repository."
                     ;;
 
@@ -77,7 +76,7 @@ while [ "$1" != "" ]; do
                     [ -L $1 ] && echo "Unlinking file \"$1\" " && dot unlink $1
                     dotfile=$(echo $PWD | sed 's@'$HOME'@'$HOME'/.dotfiles@')
                     [ ! -f $dotfile/$1 ] && echo "This file is not in your repository. Aborting." && exit 1
-                    rm $dotfile/$1
+                    rm $dotfile/$1 || exit 1 
                     echo "Removed file from repository."
                     ;; 
                     
